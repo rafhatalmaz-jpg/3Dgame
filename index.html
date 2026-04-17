@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mini Shooter</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #crosshair {
+      position: fixed;
+      top: 50%; left: 50%;
+      width: 10px; height: 10px;
+      margin-left: -5px; margin-top: -5px;
+      background: white;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+<div id="crosshair"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Свет
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(5, 10, 5);
+scene.add(light);
+
+// Карта 20x20
+const size = 20;
+for (let x = -size/2; x < size/2; x++) {
+  for (let z = -size/2; z < size/2; z++) {
+    const geo = new THREE.BoxGeometry(1, 0.1, 1);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const tile = new THREE.Mesh(geo, mat);
+    tile.position.set(x, -0.05, z);
+    scene.add(tile);
+  }
+}
+
+// "Оружие" (типо автомат в руках)
+const gunGeo = new THREE.BoxGeometry(0.3, 0.2, 1);
+const gunMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+const gun = new THREE.Mesh(gunGeo, gunMat);
+gun.position.set(0.4, -0.3, -1);
+camera.add(gun);
+scene.add(camera);
+
+// Враги
+const enemies = [];
+
+function spawnEnemy(x, z) {
+  const geo = new THREE.BoxGeometry(0.8, 1.6, 0.8);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+  const enemy = new THREE.Mesh(geo, mat);
+  enemy.position.set(x, 0.8, z);
+  scene.add(enemy);
+  enemies.push(enemy);
+}
+
+// создаём врагов
+for (let i = 0; i < 10; i++) {
+  spawnEnemy(
+    (Math.random() - 0.5) * 15,
+    (Math.random() - 0.5) * 15
+  );
+}
+
+// управление
+const keys = {};
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+document.body.addEventListener("click", () => {
+  document.body.requestPointerLock();
+});
+
+// мышка
+let yaw = 0;
+let pitch = 0;
+
+document.addEventListener("mousemove", e => {
+  if (document.pointerLockElement === document.body) {
+    yaw -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+  }
+});
+
+// стрельба
+document.addEventListener("mousedown", () => {
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+
+  const intersects = raycaster.intersectObjects(enemies);
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    scene.remove(hit);
+    enemies.splice(enemies.indexOf(hit), 1);
+  }
+});
+
+// движение
+camera.position.y = 1.6;
+
+function move() {
+  const speed = 0.1;
+
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+
+  const right = new THREE.Vector3();
+  right.crossVectors(camera.up, dir).normalize();
+
+  if (keys["w"]) camera.position.addScaledVector(dir, speed);
+  if (keys["s"]) camera.position.addScaledVector(dir, -speed);
+  if (keys["a"]) camera.position.addScaledVector(right, speed);
+  if (keys["d"]) camera.position.addScaledVector(right, -speed);
+}
+
+// анимация
+function animate() {
+  requestAnimationFrame(animate);
+
+  move();
+
+  camera.rotation.order = "YXZ";
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+
+</body>
+</html>
